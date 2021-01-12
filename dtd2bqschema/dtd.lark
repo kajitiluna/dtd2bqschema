@@ -1,0 +1,104 @@
+dtd: definition*
+
+definition: element
+          | attribute_list
+          | entity
+          | ref_entity
+          | entity_detail
+
+element: "<!ELEMENT" ELEMENT_NAME sub_term ">"
+
+sub_term: sub_factor
+        | sub_factor ( "," sub_factor )+        -> sub_sequence
+        | sub_factor ( "&" sub_factor )+        -> sub_and
+        | sub_factor ( "|" sub_factor )+        -> sub_or
+
+sub_factor: sub_element "*"     -> sub_may_repeat
+          | sub_element "+"     -> sub_must_repeat
+          | sub_element "?"     -> sub_one_or_nothing
+          | " +" sub_element    -> sub_in
+          | " -" sub_element    -> sub_not_in
+          | sub_element
+
+sub_element: "(" sub_term ")"
+           | pcdata
+           | cdata
+           | number
+           | id
+           | empty
+           | any
+           | ref_entity
+           | ref_element
+
+ref_entity: "%" ENTITY_NAME ";"
+ref_element: ELEMENT_NAME
+
+attribute_list: "<!ATTLIST" ELEMENT_NAME attribute+ ">"
+
+attribute: ATTRIBUTE_NAME attribute_types attribute_pattern
+         | ref_entity
+
+attribute_types: attribute_type
+               | attribute_values
+
+attribute_type: pcdata
+              | cdata
+              | number
+              | id
+              | name
+              | idref
+              | idrefs
+              | ELEMENT_NAME
+
+attribute_values: "(" NAME ( "|" NAME )* ")"
+
+attribute_pattern: implied
+                 | required
+                 | fixed
+                 | value
+
+entity: "<!ENTITY %" ENTITY_NAME entity_contents ">"
+
+entity_contents: "\"INCLUDE\""  -> entity_include
+               | "\"IGNORE\""   -> entity_ignore
+               | "\"" element "\""
+               | "\"" sub_term "\""
+               | "\"" attribute+ "\""
+               | public_contents
+               | any_contents
+
+public_contents: "PUBLIC" "\"" /[^"]+/+ "\"" "\"" /[^"]+/+ "\""
+any_contents: ("\"" /[^"]+/+ "\"") | ("\"\"")
+
+entity_detail: "<![" ref_entity "[" definition* "]" "]>"
+
+?implied: "#IMPLIED"
+?required: "#REQUIRED"
+?fixed: "#FIXED" "\"" /[^"]+/+ "\""
+?value: "\"" /[^"]+/+ "\""
+
+?pcdata: "#PCDATA"
+?cdata: "CDATA"
+
+?number: "NUMBER"
+?id: "ID"
+?name: "NAME"
+?idref: "IDREF"
+?idrefs: "IDREFS"
+
+?empty: "EMPTY"
+?any: "ANY"
+
+ELEMENT_NAME: NAME
+ATTRIBUTE_NAME: NAME
+ENTITY_NAME: NAME
+
+NAME: /[^\"\!<>\*\+\?,|\(\); \t\f\r\n]+/
+XML_HEADER: "<?" "xml"i /.*?/ "?>"
+HTML_COMMENT: "<!--" /.*?/s "-->"
+
+%import common.WS
+
+%ignore XML_HEADER
+%ignore HTML_COMMENT
+%ignore WS
