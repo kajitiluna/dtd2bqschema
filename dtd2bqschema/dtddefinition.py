@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Optional, Union
 from abc import ABCMeta, abstractmethod
+from collections import OrderedDict
 
 
 class BqColumnType(Enum):
@@ -60,11 +61,12 @@ class BqRecordSchema(BqSchema):
                  column_mode: Optional[BqColumnMode] = BqColumnMode.NULLABLE):
 
         super().__init__(column_name, BqColumnType.RECORD, column_mode)
-        self.fields: list = fields
+        self.fields: List[BqSchema] = fields
 
     def schema(self):
+        filtered_fields: List[BqSchema] = self._filter_same_columns()
         sub_jsons: List[str] = [sub_schema.to_json()
-                                for sub_schema in self.fields]
+                                for sub_schema in filtered_fields]
         return (
             "{"
             f'"name":"{self.column_name}"'
@@ -73,6 +75,21 @@ class BqRecordSchema(BqSchema):
             f',"fields":[{",".join(sub_jsons)}]'
             "}"
         )
+
+    def _filter_same_columns(self) -> List[BqSchema]:
+        filtered_fields: OrderedDict = OrderedDict()
+        for sub_schema in self.fields:
+            before: Optional[BqSchema] = filtered_fields.get(
+                sub_schema.column_name)
+            if before is not None:
+                if (before.column_mode == BqColumnMode.REQUIRED) \
+                        and (before.column_mode != sub_schema.column_mode):
+                    filtered_fields[sub_schema.column_name] = sub_schema
+                continue
+
+            filtered_fields[sub_schema.column_name] = sub_schema
+
+        return filtered_fields.values()
 
 
 class ConstantDef(Enum):
